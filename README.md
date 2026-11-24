@@ -1,280 +1,142 @@
-# Withings Aura for Home Assistant
+# Withings Aura server
 
-A local-only Home Assistant custom integration for the **Withings Aura
-(WSD01)** bedside unit. It talks directly to the Aura’s WPP-over-TCP bridge on
-your LAN — no Withings cloud account, official app, or external Python package.
+A small local server that lets you control a **Withings Aura (WSD01)** bedside
+unit from a Mac (or any machine on the same LAN). It talks to the Aura's
+WPP-over-TCP bridge directly — no Withings cloud account, no official app — and
+exposes a **web UI** and a **JSON HTTP API**.
 
-Tested against firmware **1301** (hardware 12).
-
-## Features
-
-- **Lamp** — colour, brightness, on/off. HA brightness is 0–255; the Aura stores colour and intensity separately. Turning off preserves the last colour/intensity, and turning on resumes it.
-- **Program volume** — 0–100 volume for the program selected in the Program select.
-- **Clock display** — on/off switch and 0–100 brightness number.
-- **Private mode** — switch.
-- **Alarms** — per-slot time and enable entities, alarm sensor, global alarm
-  switch, and `set_alarm` / `trigger_alarm` / `stop_program` / `snooze` services.
-- **Programs** — program select, start button, stop button, snooze button.
-- **Status** — playback status, firmware, alarm slots, “playing” binary sensor.
-- **Time sync** — DST-aware time/offset sync plus a diagnostic time-offset sensor.
-- **Refresh** — a button to force an immediate read (useful after local touch).
-- **Local discovery** — mDNS (`_withings-aura-bridge._tcp`), plus manual
-  host/port setup.
-- **Diagnostics** — redacts the unit’s probe secret.
+Tested against firmware **1301** (hardware 12). Independent interoperability
+project, not affiliated with Withings.
 
 ## Requirements
 
-- Home Assistant **2026.1** or newer.
-- The Aura and HA on the same LAN.
-- The Aura’s local bridge reachable on TCP port **7685**.
-- HACS (recommended) or manual copy of `custom_components/withings_aura`.
+- Python 3.12+ (`brew install python`)
+- The Aura reachable on your LAN, bridge on TCP port **7685**
+- Its IP address (reserve it in your router so it does not change)
 
-## Installation
+## Install and run
 
-### HACS (custom repository)
-
-1. HACS → Integrations → three-dot menu → **Custom repositories**.
-2. Add `https://github.com/straficchio/ha-withings-aura` as an **Integration**.
-3. Install **Withings Aura**.
-4. Restart Home Assistant.
-5. **Settings → Devices & services → Add integration → Withings Aura**.
-
-### Manual
-
-Copy `custom_components/withings_aura/` into your Home Assistant config:
-
-```text
-<config>/custom_components/withings_aura/
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e .
+.venv/bin/python -m withings_aura --aura-host 192.168.1.50
 ```
 
-Restart Home Assistant, then add the integration.
+Open <http://127.0.0.1:8686>.
 
-## Configuration
-
-The integration should be discovered automatically via mDNS. If it is not,
-choose **Withings Aura** from the add-integration dialog and enter the bridge
-host and port (default `7685`).
-
-The unit is identified by the MAC address reported by its `PROBE` reply. A
-unit that answers with a `ProbeChallenge` (command 296) requires the Withings
-association secret; the config flow aborts with a clear error rather than
-creating a half-working entry.
-
-### Options
-
-- **Status poll interval** — default 10 s (5–300 s).
-- **Alarm/program poll interval** — default 300 s (60–3600 s).
-
-## Entities
-
-| Entity | Type | Description |
+| Option | Default | |
 |---|---|---|
-| Lamp | `light` | RGB colour, brightness, on/off |
-| Clock display | `switch` | Clock display on/off |
-| Clock brightness | `number` | 0–100 |
-| Program volume | `number` | 0–100 for the selected program |
-| Private mode | `switch` | Aura private mode |
-| Alarms | `switch` | Global alarm enable |
-| Alarms | `sensor` | Configured alarms and attributes |
-| Alarm slots | `sensor` | Number of alarm slots (diagnostic) |
-| Alarm time 1–10 | `time` | Time for each alarm slot |
-| Alarm 1–10 | `switch` | Enable/disable each alarm slot |
-| Time offset | `sensor` | Current UTC offset and next DST transition (diagnostic) |
-| Firmware | `sensor` | Firmware version (diagnostic) |
-| Status | `sensor` | Idle/sleep/nap/wake-up/mood/media |
-| Playing | `binary_sensor` | A program is playing |
-| Program | `select` | Mood, Nap, Sleep, Wake-up, Retail, Media |
-| Start program | `button` | Starts the selected program |
-| Trigger alarm | `button` | Starts a wake-up program immediately |
-| Stop program | `button` | Stops the current program |
-| Snooze | `button` | Snoozes the current wake-up |
-| Sync time | `button` | Pushes HA time/clock mode |
-| Refresh | `button` | Forces an immediate coordinator refresh |
+| `--aura-host` / `AURA_HOST` | required | Aura IP or hostname |
+| `--aura-port` | 7685 | Aura bridge port |
+| `--listen` | `127.0.0.1` | Address to serve on |
+| `--port` | 8686 | HTTP port |
+| `--poll-interval` | 10 s (min 5) | Status/lamp refresh |
+| `--slow-poll-interval` | 300 s (min 60) | Alarms/program settings refresh |
+| `--radios` | `~/.withings-aura/radios.json` | Web-radio catalogue (see below) |
+| `--timezone` | system zone | IANA zone sent by *Sync time* |
+| `-v` | | Debug logging |
+
+The server exits with an error at startup if the Aura cannot be reached, and
+reconnects by itself afterwards if the connection drops.
+
+### Security
+
+**The API has no authentication.** By default it only listens on `127.0.0.1`.
+Use `--listen 0.0.0.0` only on a network you trust — anyone who can reach the
+port can change your lamp and alarms.
+
+### Start at login (launchd)
+
+```bash
+cp deploy/com.withings-aura.server.plist ~/Library/LaunchAgents/
+# edit it: set the repository path and the Aura IP
+launchctl load ~/Library/LaunchAgents/com.withings-aura.server.plist
+```
+
+Logs go to `/tmp/withings-aura.log`. Stop with `launchctl unload` on the same file.
+
+## HTTP API
+
+All bodies are JSON. Invalid input returns `400 {"error": ...}`; an unreachable
+Aura returns `502`. `GET /api/state` never includes the unit's association secret.
+
+| Method & path | Body | |
+|---|---|---|
+| `GET /api/state` | | Full cached state |
+| `POST /api/refresh` | | Read the device now |
+| `PUT /api/lamp` | `on`, `rgb` `[0-255]×3`, `brightness` 0–100 | Turning off keeps colour/intensity; turning on resumes them |
+| `PUT /api/clock` | `display`, `brightness` 0–100 | |
+| `PUT /api/private-mode` | `on` | |
+| `PUT /api/alarms/enabled` | `enabled` | Global alarm switch |
+| `PUT /api/alarms/{slot}` | `time` `"HH:MM"`, `days` (`mon`…`sun`), `enabled`, `program_id`, `one_shot_date` `"YYYY-MM-DD"`, `volume`, `brightness`, `setting_id`, `web_radio` | Slots 1–10; omitted fields keep their value; empty `days` + date = one-shot |
+| `POST /api/programs/start` | `program` (`mood` `nap` `sleep` `wake_up` `retail` `media`), `program_id`, `volume`, `brightness`, `web_radio` | |
+| `POST /api/programs/stop` | | |
+| `PUT /api/programs/{program}/settings` | `volume`, `brightness`, `program_id` | |
+| `POST /api/alarm/trigger` | `program_id`, `volume`, `brightness` | Start a wake-up program now |
+| `POST /api/snooze` | | |
+| `POST /api/time/sync` | `twelve_hour` | Sends time, UTC offset and next DST change |
+
+```bash
+curl -X PUT localhost:8686/api/lamp -H 'content-type: application/json' \
+     -d '{"on": true, "rgb": [255, 140, 60], "brightness": 40}'
+curl -X PUT localhost:8686/api/alarms/1 -d '{"time": "06:45", "days": ["mon","tue","wed","thu","fri"]}'
+```
+
+## Alarms, radio and Spotify
+
+The web page lists your alarms and has an inline editor: time, weekdays or a one-off
+date, volume, radio, and an *Advanced* section for the raw program/setting IDs. **+ Add
+alarm** always creates the next free slot (alarms are numbered by their position in the
+Aura's reply, so slots are filled in order). There is no delete: switch an alarm off.
+
+**Radio.** The Aura stores a radio as an opaque numeric station ID (for example
+`8559024957008661`) plus a display name (`FIP`). Withings' catalogue comes from the
+[airable](https://airablenow.com/?p=479) internet-radio service, and I found no public
+list of those IDs. So the server builds its own catalogue:
+
+- Set a station on an alarm in the Withings app once; the server reads it back and saves
+  `id → name` to `--radios` (a plain JSON object you can also edit by hand).
+- Saved stations appear in the editor's Radio dropdown. *Another station…* takes an ID and
+  a name and saves them too.
+- A radio alarm also uses a different program/setting than the default sound (a real FIP
+  alarm showed `program_id` 20, `setting_id` 129). When you pick a radio on a new alarm,
+  the editor copies these from your existing radio alarm.
+
+**Spotify.** Spotify on the Aura goes through Spotify Connect and needs a Spotify Premium
+account linked in the Withings app, so this server cannot choose a playlist. It only
+**keeps** what the unit reported: the Spotify tag and name are written back unchanged
+when you edit that alarm.
+
+> The station name and Spotify fields are sent back on every alarm save so editing does
+> not drop them. Whether the firmware accepts them on write has only been tested against
+> the fake bridge: try an edit on a spare slot before relying on it for an alarm you need.
 
 ## Time sync
 
-The integration uses Home Assistant’s configured timezone. **Sync time** sends
-the current UTC time, the current UTC offset, the next DST transition, and the
-next UTC offset. The **Time offset** diagnostic sensor shows what was sent. To
-change the timezone, change Home Assistant’s timezone and press **Sync time**;
-there is no separate Aura timezone setting.
-
-## Local touch
-
-The Aura is polled every 10 seconds by default. Press **Refresh** for an
-immediate read after touching the lamp. `GET_LAMP` returns the actual colour
-and the on/off state byte; the integration uses that state byte rather than
-assuming “colour > 0 means on”. If the lamp still does not update, the firmware
-is not exposing its local touch state through `GET_LAMP`.
-
-## Services
-
-Volume is stored per program. The **Program volume** number applies to the
-program currently selected in the **Program** select. Alarm volume is set per
-alarm with the `set_alarm` service.
-
-All services accept an optional `entry_id`; omit it when only one Aura is
-configured.
-
-### `withings_aura.start_program`
-
-```yaml
-service: withings_aura.start_program
-data:
-  program_type: nap
-  program_id: 1
-  volume: 50
-  brightness: 97
-```
-
-`program_type` is one of `mood`, `nap`, `sleep`, `wake_up`, `retail`, `media`.
-
-### `withings_aura.set_alarm`
-
-```yaml
-service: withings_aura.set_alarm
-data:
-  slot: 1
-  time: "06:45"
-  days: [mon, tue, wed, thu, fri]
-  program_id: 15
-  enabled: true
-  volume: 46
-  brightness: 50
-```
-
-`days` uses `mon`…`sun`; leave it empty for a one-shot alarm and set
-`one_shot_date: "2026-11-01"` if needed. For the UI, set the time with the
-**Alarm N time** entity and toggle **Alarm N**; use this service when you need
-to change the weekday mask, program or volume.
-
-### `withings_aura.trigger_alarm`
-
-```yaml
-service: withings_aura.trigger_alarm
-data:
-  program_id: 15
-  volume: 50
-  brightness: 50
-```
-
-### `withings_aura.stop_program`
-
-```yaml
-service: withings_aura.stop_program
-```
-
-### `withings_aura.snooze`
-
-```yaml
-service: withings_aura.snooze
-```
-
-### `withings_aura.set_alarm_enabled`
-
-```yaml
-service: withings_aura.set_alarm_enabled
-data:
-  enabled: true
-```
-
-### `withings_aura.set_clock_display`
-
-```yaml
-service: withings_aura.set_clock_display
-data:
-  display: true
-  brightness: 55
-```
-
-### `withings_aura.sync_time`
-
-```yaml
-service: withings_aura.sync_time
-data:
-  twelve_hour: false
-```
-
-### `withings_aura.set_program_settings`
-
-```yaml
-service: withings_aura.set_program_settings
-data:
-  program_type: sleep
-  volume: 29
-  brightness: 50
-  program_id: 1
-```
-
-## Example automations
-
-Turn the lamp on at sunset:
-
-```yaml
-automation:
-  - alias: Aura mood light at sunset
-    triggers:
-      - trigger: sun
-        event: sunset
-    actions:
-      - action: light.turn_on
-        target:
-          entity_id: light.withings_aura_lamp
-        data:
-          rgb_color: [255, 140, 80]
-          brightness: 20
-```
-
-Trigger the wake-up alarm from an automation:
-
-```yaml
-actions:
-  - action: withings_aura.trigger_alarm
-    data:
-      program_id: 15
-      volume: 50
-```
-
-## Troubleshooting
-
-- **Cannot connect** — confirm the Aura is on the same LAN and that TCP 7685
-  is reachable. The integration uses the address from mDNS; use the manual
-  flow if mDNS is blocked.
-- **`unsupported_auth`** — the unit answered with a `ProbeChallenge` and
-  requires the Withings association secret. Local control is not available
-  for that unit without the secret.
-- **Lamp writes feel delayed** — the firmware fades and rate-limits colour
-  writes. The integration debounces rapid changes, sends writes serially, and
-  refreshes after a short delay.
-- **Status not updating** — check the options poll interval and the HA log for
-  `withings_aura` connection errors.
+*Sync time* sends the current UTC time, the UTC offset of the server's timezone,
+the next DST transition and its offset. The zone is taken from the system
+(`/etc/localtime`) unless `--timezone` is given. There is no separate timezone
+setting on the Aura.
 
 ## Limitations
 
-- Cloud-only data (sleep history, environment graphs, resting heart rate) is
-  not exposed.
-- No Spotify playback control and no A2DP switch in v1.
-- No firmware flashing, Wi-Fi reconfiguration, factory reset, or sleep-sensor
-  association.
-- The protocol is undocumented and may change with firmware; this integration
-  is tested against firmware 1301.
+- No automatic discovery: pass the Aura's IP (the unit advertises
+  `_withings-aura-bridge._tcp` over mDNS if you want to look it up).
+- A unit that answers with a `ProbeChallenge` (command 296) requires the Withings
+  association secret and is not supported.
+- Single Aura per server process.
 
 ## Development
 
 ```bash
-uv venv .venv --python 3.13
-uv pip install --python .venv/bin/python pytest pytest-asyncio \
-  pytest-homeassistant-custom-component ruff
+.venv/bin/pip install -e ".[test]"
 .venv/bin/pytest
-.venv/bin/ruff check custom_components tests
+.venv/bin/ruff check withings_aura tests
 ```
 
-The protocol layer is pure Python and covered by golden-frame tests; the HA
-layer uses a fake TCP bridge so tests do not need a real Aura.
+The tests run against a fake bridge (`tests/fake_bridge.py`) that replays
+captured replies; no hardware is needed.
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-This is an independent interoperability project, not affiliated with or
-endorsed by Withings.

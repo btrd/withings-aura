@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from custom_components.withings_aura.const import (
+from withings_aura.const import (
     CMD_SET_ALARM,
     CMD_SET_LAMP,
     CMD_SET_SETTINGS,
@@ -14,15 +14,15 @@ from custom_components.withings_aura.const import (
     CMD_STOP_PROGRAM,
     CMD_TIME_SET,
 )
-from custom_components.withings_aura.device import AuraDevice
-from custom_components.withings_aura.protocol import (
-    ProbeChallengeError,
+from withings_aura.device import AuraDevice
+from withings_aura.exceptions import ProbeChallengeError
+from withings_aura.protocol import (
     build_set_alarm,
     build_set_lamp,
     decode_tlvs,
     tlv,
 )
-from custom_components.withings_aura.transport import AuraBridge
+from withings_aura.transport import AuraBridge
 
 
 async def test_probe_and_reads(fake_bridge) -> None:

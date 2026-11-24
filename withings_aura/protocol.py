@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from .const import (
@@ -12,8 +12,11 @@ from .const import (
     DEFAULT_PROGRAM_IDS,
     PROGRAM_SETTING_BRIGHTNESS,
     PROGRAM_SETTING_ID,
+    PROGRAM_SETTING_SPOTIFY_NAME,
+    PROGRAM_SETTING_SPOTIFY_TAG,
     PROGRAM_SETTING_VOLUME,
     PROGRAM_SETTING_WEB_RADIO,
+    PROGRAM_SETTING_WEB_RADIO_NAME,
     TLV_ALARM_ENABLED,
     TLV_ALARM_ID,
     TLV_CLOCK_DISPLAY,
@@ -34,16 +37,9 @@ from .const import (
     TLV_SUBSTATUS,
     TLV_TIME_SET,
 )
+from .exceptions import AuraProtocolError
 from .models import Alarm, AuraSettings, AuraStatus, LampState, ProbeInfo, ProgramInfo
 from .util import next_dst_transition
-
-
-class AuraProtocolError(Exception):
-    """Base protocol error."""
-
-
-class ProbeChallengeError(AuraProtocolError):
-    """The unit requires the association secret (ProbeChallenge)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +126,13 @@ def _string(value: bytes, offset: int) -> tuple[str, int]:
 
 def decode_probe_reply(value: bytes) -> ProbeInfo:
     """Decode the ProbeReply TLV."""
+    try:
+        return _decode_probe_reply(value)
+    except (struct.error, IndexError) as err:
+        raise AuraProtocolError(f"malformed ProbeReply: {value.hex()}") from err
+
+
+def _decode_probe_reply(value: bytes) -> ProbeInfo:
     offset = 0
     vid, pid = struct.unpack(">HH", value[offset : offset + 4])
     offset += 4
@@ -215,48 +218,39 @@ def _program_setting_value(value: bytes) -> tuple[int, str]:
     return key, value[2 : 2 + length].decode("utf-8", "replace")
 
 
+_ALARM_SETTING_FIELDS = {
+    PROGRAM_SETTING_VOLUME: "volume",
+    PROGRAM_SETTING_BRIGHTNESS: "brightness",
+    PROGRAM_SETTING_ID: "setting_id",
+    PROGRAM_SETTING_WEB_RADIO: "web_radio",
+    PROGRAM_SETTING_WEB_RADIO_NAME: "web_radio_name",
+    PROGRAM_SETTING_SPOTIFY_TAG: "spotify_tag",
+    PROGRAM_SETTING_SPOTIFY_NAME: "spotify_name",
+}
+
+
 def decode_alarms(body: bytes) -> list[Alarm]:
     """Decode a GET_ALARMS reply into alarm objects."""
     alarms: list[Alarm] = []
-    current: dict | None = None
     for tlv_type, value in decode_tlvs(body):
         if tlv_type == TLV_SET_ALARM and len(value) >= 7:
             hour, minute, days, day, month, year, program = struct.unpack(">BBBBBBB", value[:7])
-            current = {
-                "slot": len(alarms) + 1,
-                "hour": hour,
-                "minute": minute,
-                "enabled": bool(days & ALARM_ENABLED_BIT),
-                "days_mask": days & 0x7F,
-                "one_shot_date": None if day == 0 else f"{year + 2000:04d}-{month:02d}-{day:02d}",
-                "program_id": program,
-            }
-            alarms.append(Alarm(**current))
+            alarms.append(
+                Alarm(
+                    slot=len(alarms) + 1,
+                    hour=hour,
+                    minute=minute,
+                    enabled=bool(days & ALARM_ENABLED_BIT),
+                    days_mask=days & 0x7F,
+                    one_shot_date=None if day == 0 else f"{year + 2000:04d}-{month:02d}-{day:02d}",
+                    program_id=program,
+                )
+            )
         elif tlv_type == TLV_PROGRAM_SETTING and len(value) >= 2 and alarms:
             key, text = _program_setting_value(value)
-            current = current or {}
-            current[key] = text
-            # Replace the last alarm with the updated settings.
-            base = alarms[-1]
-            updates = {}
-            if key == PROGRAM_SETTING_VOLUME:
-                updates["volume"] = text
-            elif key == PROGRAM_SETTING_BRIGHTNESS:
-                updates["brightness"] = text
-            elif key == PROGRAM_SETTING_ID:
-                updates["setting_id"] = text
-            elif key == 4:
-                updates["web_radio"] = text
-            elif key == 8:
-                updates["web_radio_name"] = text
-            elif key == 6:
-                updates["spotify_tag"] = text
-            elif key == 7:
-                updates["spotify_name"] = text
-            if updates:
-                from dataclasses import replace
-
-                alarms[-1] = replace(base, **updates)
+            field = _ALARM_SETTING_FIELDS.get(key)
+            if field is not None:
+                alarms[-1] = replace(alarms[-1], **{field: text})
     return alarms
 
 
@@ -421,6 +415,9 @@ def build_set_alarm(
     brightness: int | None = None,
     setting_id: int | None = None,
     web_radio: str | None = None,
+    web_radio_name: str | None = None,
+    spotify_tag: str | None = None,
+    spotify_name: str | None = None,
 ) -> bytes:
     """Build SET_ALARM (297)."""
     day = month = year = 0
@@ -441,6 +438,12 @@ def build_set_alarm(
         settings[PROGRAM_SETTING_ID] = str(setting_id)
     if web_radio is not None:
         settings[PROGRAM_SETTING_WEB_RADIO] = web_radio
+    if web_radio_name is not None:
+        settings[PROGRAM_SETTING_WEB_RADIO_NAME] = web_radio_name
+    if spotify_tag is not None:
+        settings[PROGRAM_SETTING_SPOTIFY_TAG] = spotify_tag
+    if spotify_name is not None:
+        settings[PROGRAM_SETTING_SPOTIFY_NAME] = spotify_name
     return body + build_program_settings(settings)
 
 

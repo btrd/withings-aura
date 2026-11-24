@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
 
-from custom_components.withings_aura.protocol import (
+from withings_aura.protocol import (
     decode_tlvs,
     decode_wpp,
     extract_frag_frames,

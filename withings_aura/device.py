@@ -28,11 +28,9 @@ from .const import (
     PROGRAM_TYPE_NAMES,
     TLV_PROBE_REPLY,
 )
-from .exceptions import AuraTimeoutError
+from .exceptions import AuraProtocolError, AuraTimeoutError, ProbeChallengeError
 from .models import Alarm, AuraSettings, AuraStatus, LampState, ProbeInfo, ProgramInfo
 from .protocol import (
-    AuraProtocolError,
-    ProbeChallengeError,
     build_clock_mode,
     build_get_program_info,
     build_get_program_settings,
@@ -174,6 +172,9 @@ class AuraDevice:
         brightness: int | None = None,
         setting_id: int | None = None,
         web_radio: str | None = None,
+        web_radio_name: str | None = None,
+        spotify_tag: str | None = None,
+        spotify_name: str | None = None,
     ) -> None:
         await self.bridge.async_request(
             CMD_SET_ALARM,
@@ -189,6 +190,9 @@ class AuraDevice:
                 brightness,
                 setting_id,
                 web_radio,
+                web_radio_name,
+                spotify_tag,
+                spotify_name,
             ),
         )
 

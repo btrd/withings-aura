@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import struct
 
-from custom_components.withings_aura.const import (
+from withings_aura.const import (
     ALARM_ENABLED_BIT,
     TLV_PROGRAM_SETTING,
     TLV_SET_ALARM,
 )
-from custom_components.withings_aura.models import LampState
-from custom_components.withings_aura.protocol import (
+from withings_aura.models import LampState
+from withings_aura.protocol import (
     build_set_alarm,
     build_set_lamp,
     decode_alarms,

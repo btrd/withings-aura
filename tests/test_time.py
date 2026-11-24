@@ -6,8 +6,8 @@ import struct
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from custom_components.withings_aura.protocol import build_time_set, decode_tlvs
-from custom_components.withings_aura.util import next_dst_transition, time_sync_info
+from withings_aura.protocol import build_time_set, decode_tlvs
+from withings_aura.util import next_dst_transition, time_sync_info
 
 
 def test_next_dst_transition_europe_rome() -> None:

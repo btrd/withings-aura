@@ -1,33 +1,13 @@
-"""Constants for the Withings Aura integration."""
+"""Constants for the Withings Aura server."""
 
 from __future__ import annotations
 
-from datetime import timedelta
-
-from homeassistant.const import CONF_HOST as CONF_HOST
-from homeassistant.const import CONF_PORT as CONF_PORT
-
-DOMAIN = "withings_aura"
-MANUFACTURER = "Withings"
-MODEL = "Aura (WSD01)"
-DEFAULT_NAME = "Withings Aura"
 DEFAULT_PORT = 7685
 DEFAULT_POLL_INTERVAL = 10
 DEFAULT_SLOW_POLL_INTERVAL = 300
 MIN_POLL_INTERVAL = 5
-MAX_POLL_INTERVAL = 300
 MIN_SLOW_POLL_INTERVAL = 60
-MAX_SLOW_POLL_INTERVAL = 3600
 ZEROCONF_TYPE = "_withings-aura-bridge._tcp.local."
-
-CONF_MAC = "mac"
-CONF_FIRMWARE = "firmware"
-CONF_POLL_INTERVAL = "poll_interval"
-CONF_SLOW_POLL_INTERVAL = "slow_poll_interval"
-CONF_ENTRY_ID = "entry_id"
-
-DEFAULT_SCAN_INTERVAL = timedelta(seconds=DEFAULT_POLL_INTERVAL)
-DEFAULT_SLOW_INTERVAL = timedelta(seconds=DEFAULT_SLOW_POLL_INTERVAL)
 
 # WPP commands
 CMD_PROBE = 257
@@ -117,15 +97,11 @@ PROGRAM_SETTING_WEB_RADIO_NAME = 8
 PROGRAM_SETTING_SPOTIFY_TAG = 6
 PROGRAM_SETTING_SPOTIFY_NAME = 7
 
+UNSET_VALUE = "18446744073709551615"  # the firmware's "not set" marker (u64 max)
+DEFAULT_ALARM_PROGRAM_ID = 15
+WAKE_UP_PROGRAM_TYPE = 4
+MAX_ALARM_SLOTS = 10
+
 # Alarm days
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-DAY_LABELS = {
-    "mon": "Mon",
-    "tue": "Tue",
-    "wed": "Wed",
-    "thu": "Thu",
-    "fri": "Fri",
-    "sat": "Sat",
-    "sun": "Sun",
-}
 ALARM_ENABLED_BIT = 0x80

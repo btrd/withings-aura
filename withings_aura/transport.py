@@ -7,8 +7,8 @@ import logging
 from collections.abc import Iterable
 
 from .const import CMD_DISCONNECT, DEFAULT_PORT
-from .exceptions import AuraConnectionError, AuraTimeoutError
-from .protocol import AuraProtocolError, decode_wpp, encode_request, extract_frag_frames
+from .exceptions import AuraConnectionError, AuraProtocolError, AuraTimeoutError
+from .protocol import decode_wpp, encode_request, extract_frag_frames
 
 _LOGGER = logging.getLogger(__name__)
 

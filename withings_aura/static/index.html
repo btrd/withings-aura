@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Aura</title>
+<style>
+  :root {
+    --bg: #f4f5f9; --surface: #ffffff; --surface-2: #eef0f6; --text: #14161f; --muted: #6b7084;
+    --line: #e2e5ee; --accent: #5b5bf0; --accent-ink: #ffffff; --ok: #1fa971; --bad: #e5484d;
+    --shadow: 0 1px 2px rgba(20, 22, 31, .05), 0 8px 24px rgba(20, 22, 31, .06);
+    --radius: 20px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0e14; --surface: #171923; --surface-2: #20232f; --text: #eceef6; --muted: #8b90a6;
+      --line: #292c3a; --accent: #7c7cff; --accent-ink: #0d0e14;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
+  h1 { margin: 0; font-size: 1.7rem; letter-spacing: -.02em; }
+  .sub { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+  h2 { margin: 0; font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); font-weight: 500; font-size: .9rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 22%, transparent); }
+  .dot.bad { background: var(--bad); }
+  main { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  main > * { min-width: 0; }
+  @media (min-width: 820px) {
+    main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "light programs" "light clock" "alarms alarms"; }
+    #card-light { grid-area: light; } #card-programs { grid-area: programs; } #card-clock { grid-area: clock; } #card-alarms { grid-area: alarms; }
+  }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .field { display: grid; gap: 8px; margin: 16px 0 0; }
+  .field-top { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+  .value { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 400; }
+  .line { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-weight: 500; }
+  .card-head + .line { border-top: 0; padding-top: 0; }
+
+  /* controls */
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; border-radius: 12px; padding: 10px 16px; background: var(--surface-2); font-weight: 500; transition: transform .08s, background .15s; }
+  button:hover { background: color-mix(in srgb, var(--surface-2) 80%, var(--text) 8%); }
+  button:active { transform: scale(.97); }
+  button.primary { background: var(--accent); color: var(--accent-ink); }
+  button.primary:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+  button.ghost { background: transparent; color: var(--muted); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .actions .grow { flex: 1; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; background: var(--surface-2); outline-offset: 6px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.3); cursor: grab; }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); cursor: grab; }
+  input[type=time], input[type=date], input[type=number], input[type=text], select {
+    font: inherit; color: inherit; background: var(--surface-2); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; min-width: 0;
+  }
+  .switch { position: relative; display: inline-block; width: 46px; height: 28px; flex: none; }
+  .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); transition: background .2s; }
+  .switch span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s; }
+  .switch input:checked + span { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* lamp */
+  #card-light { display: flex; flex-direction: column; }
+  .lamp { flex: 1; display: grid; place-items: center; padding: 16px 0 4px; }
+  .orb { width: 132px; height: 132px; border-radius: 50%; padding: 0; position: relative; background: var(--surface-2); border: 1px solid var(--line); transition: background .3s, box-shadow .3s; }
+  .orb::after { content: ""; position: absolute; inset: 0; margin: auto; width: 30px; height: 30px; border: 3px solid currentColor; border-radius: 50%; border-top-color: transparent; opacity: .5; }
+  .orb::before { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 18px; margin: -19px 0 0 -1.5px; background: currentColor; border-radius: 2px; opacity: .5; }
+  .orb.on { border-color: transparent; color: rgba(0, 0, 0, .55); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; padding: 0; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line); }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.custom { position: relative; overflow: hidden; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+  .swatch.custom input { position: absolute; inset: -8px; width: 60px; height: 60px; opacity: 0; cursor: pointer; }
+
+  /* chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 7px 12px; border-radius: 999px; font-size: .85rem; background: var(--surface-2); color: var(--muted); }
+  .chip[aria-pressed=true], .chip.on { background: var(--accent); color: var(--accent-ink); }
+  .chip.day { min-width: 44px; padding: 7px 8px; text-align: center; }
+  .tiny { padding: 2px 7px; font-size: .72rem; min-width: 0; }
+
+  /* alarms */
+  .alarm { border-top: 1px solid var(--line); padding: 14px 0; }
+  .alarm:first-of-type { border-top: 0; }
+  .alarm-row { display: flex; align-items: center; gap: 14px; }
+  .time { font-size: 2rem; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; min-width: 5.2rem; }
+  .alarm.off .time, .alarm.off .chips { opacity: .45; }
+  .alarm-info { flex: 1; display: grid; gap: 6px; min-width: 0; }
+  .tag { display: inline-flex; gap: 6px; align-items: center; font-size: .82rem; color: var(--muted); }
+  @media (max-width: 560px) {
+    .alarm-row { flex-wrap: wrap; row-gap: 10px; }
+    .time { flex: 1; }
+    .alarm-info { order: 3; flex-basis: 100%; }
+  }
+  .editor { display: grid; gap: 4px; background: var(--surface-2); border-radius: 16px; padding: 16px; margin-top: 14px; }
+  .editor .field { margin-top: 12px; }
+  .editor .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .editor input[type=time], .editor input[type=date], .editor input[type=number], .editor input[type=text], .editor select { background: var(--surface); }
+  .editor input[type=range] { background: var(--line); }
+  .editor .chip:not([aria-pressed=true]) { background: var(--surface); }
+  details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margin-top: 14px; }
+  .note { color: var(--muted); font-size: .82rem; }
+  .empty { color: var(--muted); padding: 8px 0 16px; }
+
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; max-width: min(92vw, 520px); padding: 12px 18px; border-radius: 14px; background: var(--text); color: var(--bg); box-shadow: var(--shadow); transition: opacity .2s, transform .2s; font-weight: 500; z-index: 10; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.bad { background: var(--bad); color: #fff; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div><h1>Aura</h1><p class="sub" id="meta">Connecting…</p></div>
+    <div class="pill" id="status"><span class="dot" id="status-dot"></span><span id="status-text">…</span></div>
+  </header>
+
+  <main>
+    <section class="card" id="card-light" aria-labelledby="lamp-title">
+      <div class="card-head"><h2 id="lamp-title">Light</h2><span class="value" id="lamp-state"></span></div>
+      <div class="lamp"><button class="orb" id="orb" aria-label="Toggle light"></button></div>
+      <div class="swatches" id="swatches"></div>
+      <div class="field">
+        <div class="field-top"><label for="lamp-brightness">Brightness</label><span class="value" id="lamp-brightness-value"></span></div>
+        <input type="range" id="lamp-brightness" min="0" max="100">
+      </div>
+    </section>
+
+    <section class="card" id="card-programs" aria-labelledby="prog-title">
+      <div class="card-head"><h2 id="prog-title">Programs</h2></div>
+      <div class="chips" id="programs" role="group" aria-label="Program"></div>
+      <div class="field">
+        <div class="field-top"><label for="program-volume">Volume</label><span class="value" id="program-volume-value"></span></div>
+        <input type="range" id="program-volume" min="0" max="100">
+      </div>
+      <div class="actions">
+        <button class="primary grow" id="start">Start</button>
+        <button id="stop">Stop</button>
+        <button id="snooze">Snooze</button>
+      </div>
+    </section>
+
+    <section class="card" id="card-clock" aria-labelledby="clock-title">
+      <div class="card-head"><h2 id="clock-title">Clock</h2></div>
+      <div class="line"><label for="clock-display">Show clock</label><label class="switch"><input type="checkbox" role="switch" id="clock-display"><span></span></label></div>
+      <div class="field">
+        <div class="field-top"><label for="clock-brightness">Clock brightness</label><span class="value" id="clock-brightness-value"></span></div>
+        <input type="range" id="clock-brightness" min="0" max="100">
+      </div>
+      <div class="line" style="margin-top:16px"><label for="private-mode">Private mode</label><label class="switch"><input type="checkbox" role="switch" id="private-mode"><span></span></label></div>
+      <div class="actions"><button id="sync-time">Sync time</button><span class="note" id="sync-info" style="align-self:center"></span></div>
+    </section>
+
+    <section class="card" id="card-alarms" aria-labelledby="alarm-title">
+      <div class="card-head">
+        <h2 id="alarm-title">Alarms</h2>
+        <label class="field-top" style="gap:10px">All alarms <span class="switch"><input type="checkbox" role="switch" id="alarms-enabled" aria-label="All alarms"><span></span></span></label>
+      </div>
+      <div id="alarms"></div>
+    </section>
+  </main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"];
+const PROGRAMS = [["mood", "Mood"], ["nap", "Nap"], ["sleep", "Sleep"], ["wake_up", "Wake-up"], ["media", "Media"]];
+const SWATCHES = [[255, 180, 107], [255, 255, 255], [255, 70, 50], [255, 140, 0], [60, 220, 120], [60, 130, 255], [170, 90, 255], [255, 100, 180]];
+const UNSET = "18446744073709551615";   // the firmware's "not set" marker
+const MAX_SLOTS = 10;
+
+let state = null;
+let program = "mood";
+let editing = null;       // slot number being edited; the list is left alone meanwhile
+let dragging = false;     // do not fight a slider the user is holding
+
+// ---- helpers ---------------------------------------------------------------
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value == null || value === false) continue;
+    if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else if (key === "class") el.className = value;
+    else el.setAttribute(key, value === true ? "" : value);
+  }
+  el.append(...kids.flat().filter((kid) => kid != null && kid !== false));
+  return el;
+}
+const clean = (value) => (value == null || value === UNSET ? "" : String(value));
+const rgbCss = (rgb, alpha = 1) => `rgba(${rgb.join(",")},${alpha})`;
+const hexToRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+let toastTimer = null;
+function toast(message, bad = false) {
+  const el = $("toast");
+  el.textContent = message; el.className = "show" + (bad ? " bad" : "");
+  clearTimeout(toastTimer);
+  if (!bad) toastTimer = setTimeout(() => { el.className = ""; }, 2500);
+}
+
+async function api(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || response.statusText);
+  return data;
+}
+
+async function act(method, path, body, success) {
+  try {
+    await api(method, path, body);
+    if (success) toast(success);
+    await load();
+  } catch (err) {
+    toast(err.message, true);
+    await load().catch(() => {});
+  }
+}
+
+async function load() {
+  try { state = await api("GET", "/api/state"); }
+  catch (err) { renderOffline(err.message); throw err; }
+  render();
+}
+
+// ---- rendering -------------------------------------------------------------
+function renderOffline(message) {
+  $("status-dot").className = "dot bad";
+  $("status-text").textContent = "Offline";
+  $("meta").textContent = message;
+}
+
+function render() {
+  const s = state;
+  const offline = Boolean(s.error);
+  $("status-dot").className = "dot " + (offline ? "bad" : s.status.playing ? "ok" : "");
+  $("status-text").textContent = offline ? "Offline" : s.status.playing ? `Playing · ${s.status.name}` : s.status.name;
+  $("meta").textContent = offline ? s.error : `Firmware ${s.device.firmware} · ${s.device.mac}`;
+
+  const lamp = s.lamp;
+  const orb = $("orb");
+  orb.className = "orb" + (lamp.on ? " on" : "");
+  orb.style.background = lamp.on ? rgbCss(lamp.rgb, 0.35 + lamp.brightness / 160) : "";
+  orb.style.boxShadow = lamp.on ? `0 0 ${24 + lamp.brightness * 0.7}px ${rgbCss(lamp.rgb, 0.55)}` : "";
+  $("lamp-state").textContent = lamp.on ? "On" : "Off";
+  if (!dragging) {
+    $("lamp-brightness").value = lamp.brightness;
+    $("lamp-brightness-value").textContent = lamp.brightness + "%";
+    $("clock-brightness").value = s.clock.brightness;
+    $("clock-brightness-value").textContent = s.clock.brightness + "%";
+    const volume = s.programs[program]?.volume ?? 50;
+    $("program-volume").value = volume;
+    $("program-volume-value").textContent = volume + "%";
+  }
+  $("clock-display").checked = s.clock.display;
+  $("private-mode").checked = s.private_mode;
+  $("alarms-enabled").checked = Boolean(s.alarms.enabled);
+  $("sync-info").textContent = s.time_sync ? `${s.time_sync.timezone} ${s.time_sync.utc_offset_text}` : "";
+  renderPrograms();
+  if (editing === null) renderAlarms();
+}
+
+function renderPrograms() {
+  $("programs").replaceChildren(...PROGRAMS.map(([key, label]) =>
+    h("button", { class: "chip", "aria-pressed": String(key === program), onclick: () => { program = key; render(); } }, label)));
+}
+
+function dayChips(active, interactive, onToggle) {
+  return h("div", { class: "chips" }, DAYS.map((day) => {
+    const label = day.charAt(0).toUpperCase() + day.slice(1);
+    return interactive
+      ? h("button", { class: "chip day", type: "button", "aria-pressed": String(active.has(day)), onclick: (e) => { onToggle(day); e.currentTarget.setAttribute("aria-pressed", String(active.has(day))); } }, label)
+      : h("span", { class: "chip day tiny" + (active.has(day) ? " on" : "") }, label);
+  }));
+}
+
+function alarmSummary(alarm) {
+  const source = alarm.spotify_name ? `Spotify · ${alarm.spotify_name}` : alarm.web_radio_name ? `Radio · ${alarm.web_radio_name}` : clean(alarm.web_radio) ? "Radio" : "Default sound";
+  const when = alarm.one_shot_date ? h("span", { class: "tag" }, `Once · ${alarm.one_shot_date}`) : dayChips(new Set(alarm.days), false);
+  return h("div", { class: "alarm-info" }, when, h("span", { class: "tag" }, source));
+}
+
+function renderAlarms() {
+  const items = state.alarms.items;
+  const nodes = items.map((alarm) => {
+    const toggle = h("input", { type: "checkbox", role: "switch", "aria-label": `Alarm ${alarm.slot} on`, onchange: (e) => act("PUT", `/api/alarms/${alarm.slot}`, { enabled: e.target.checked }) });
+    toggle.checked = alarm.enabled;
+    return h("div", { class: "alarm" + (alarm.enabled ? "" : " off"), "data-slot": alarm.slot },
+      h("div", { class: "alarm-row" },
+        h("div", { class: "time" }, alarm.time),
+        alarmSummary(alarm),
+        h("button", { class: "ghost", onclick: () => openEditor(alarm.slot) }, "Edit"),
+        h("label", { class: "switch" }, toggle, h("span"))));
+  });
+  if (!items.length) nodes.push(h("div", { class: "empty" }, "No alarms yet."));
+  // Alarms are numbered by their position in the Aura's reply, so only the next
+  // free slot is offered: filling slots in order keeps the numbering unambiguous.
+  if (items.length < MAX_SLOTS) nodes.push(h("div", { class: "actions" }, h("button", { onclick: () => openEditor(items.length + 1) }, "+ Add alarm")));
+  $("alarms").replaceChildren(...nodes);
+}
+
+// ---- alarm editor ----------------------------------------------------------
+function openEditor(slot) {
+  editing = slot;
+  const items = state.alarms.items;
+  const alarm = items.find((a) => a.slot === slot) || null;
+  const template = items.find((a) => clean(a.web_radio));   // an existing radio alarm: copy its program settings
+  const days = new Set(alarm ? alarm.days : WEEKDAYS);
+
+  const time = h("input", { type: "time", value: alarm ? alarm.time : "07:00", required: true });
+  const enabled = h("input", { type: "checkbox", role: "switch" }); enabled.checked = alarm ? alarm.enabled : true;
+  const date = h("input", { type: "date", value: alarm?.one_shot_date || "" });
+  const volume = h("input", { type: "range", min: 0, max: 100 }); volume.value = clean(alarm?.volume) || 30;
+  const volumeValue = h("span", { class: "value" }, `${volume.value}%`);
+  let volumeTouched = !alarm || clean(alarm.volume) !== "";   // do not invent a volume for an alarm that has none
+  volume.addEventListener("input", () => { volumeValue.textContent = volume.value + "%"; volumeTouched = true; });
+  const programInput = h("input", { type: "number", min: 0, max: 255, placeholder: "default" }); programInput.value = clean(alarm?.program_id);
+  const setting = h("input", { type: "number", min: 0, max: 255, placeholder: "none" }); setting.value = clean(alarm?.setting_id);
+
+  const stationId = h("input", { type: "text", placeholder: "Station ID", inputmode: "numeric", maxlength: 64 });
+  const stationName = h("input", { type: "text", placeholder: "Name (e.g. FIP)", maxlength: 64 });
+  const other = h("div", { class: "row", hidden: true }, stationId, stationName);
+  const radio = h("select", {},
+    h("option", { value: "" }, alarm && clean(alarm.web_radio) ? "Keep current" : "Default sound"),
+    ...state.radios.map((r) => h("option", { value: r.id }, r.name)),
+    h("option", { value: "__other" }, "Another station…"));
+  radio.value = clean(alarm?.web_radio);
+  if (radio.value !== clean(alarm?.web_radio)) radio.value = "";
+  radio.addEventListener("change", () => {
+    other.hidden = radio.value !== "__other";
+    if (radio.value && radio.value !== "__other" && !alarm && template) {
+      programInput.value = clean(template.program_id); setting.value = clean(template.setting_id);
+    }
+  });
+
+  const save = h("button", { class: "primary grow", type: "submit" }, alarm ? "Save" : "Add alarm");
+  const form = h("form", { class: "editor", onsubmit: async (e) => {
+    e.preventDefault();
+    const body = { time: time.value, enabled: enabled.checked, days: date.value ? [] : DAYS.filter((d) => days.has(d)), one_shot_date: date.value };
+    if (volumeTouched) body.volume = +volume.value;
+    if (programInput.value !== "") body.program_id = +programInput.value;
+    if (setting.value !== "") body.setting_id = +setting.value;
+    if (radio.value === "__other") { body.web_radio = stationId.value.trim(); body.web_radio_name = stationName.value.trim() || undefined; }
+    else if (radio.value) body.web_radio = radio.value;
+    if (radio.value === "__other" && !body.web_radio) return toast("Enter the station ID", true);
+    try {
+      await api("PUT", `/api/alarms/${slot}`, body);
+      editing = null; toast(alarm ? "Alarm saved" : "Alarm added"); await load();
+    } catch (err) { toast(err.message, true); }
+  } },
+    h("div", { class: "row" }, time, h("label", { class: "row" }, "On", h("span", { class: "switch" }, enabled, h("span")))),
+    h("div", { class: "field" }, h("div", { class: "field-top" }, "Repeat"), dayChips(days, true, (d) => (days.has(d) ? days.delete(d) : days.add(d)))),
+    h("div", { class: "field" }, h("div", { class: "field-top" }, "Or once on", date), h("span", { class: "note" }, "A date makes this a one-time alarm and clears the days.")),
+    h("div", { class: "field" }, h("div", { class: "field-top" }, "Volume", volumeValue), volume),
+    h("div", { class: "field" }, h("div", { class: "field-top" }, "Radio"), radio, other,
+      alarm?.spotify_name ? h("span", { class: "note" }, `Spotify “${alarm.spotify_name}” is kept as is.`) : null,
+      !state.radios.length ? h("span", { class: "note" }, "Stations appear here once you set one on an alarm in the Withings app.") : null),
+    h("details", {}, h("summary", {}, "Advanced"),
+      h("div", { class: "row", style: "margin-top:10px" }, h("label", { class: "row" }, "Program", programInput), h("label", { class: "row" }, "Setting", setting)),
+      h("span", { class: "note" }, template ? "Radio alarms use the program/setting of your existing radio alarm; these are filled in for you." : "Leave empty to use the defaults.")),
+    h("div", { class: "actions" }, save, h("button", { type: "button", onclick: () => { editing = null; renderAlarms(); } }, "Cancel")));
+
+  renderAlarms();
+  ($("alarms").querySelector(`[data-slot="${slot}"]`) || $("alarms")).append(form);
+  time.focus();
+}
+
+// ---- wiring ----------------------------------------------------------------
+document.addEventListener("pointerdown", (e) => { dragging = e.target.type === "range"; });
+for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => { dragging = false; });
+
+$("orb").addEventListener("click", () => act("PUT", "/api/lamp", { on: !state.lamp.on }));
+$("swatches").append(
+  ...SWATCHES.map((rgb) => h("button", { class: "swatch", "aria-label": `Colour ${rgb.join(",")}`, style: `background:${rgbCss(rgb)}`, onclick: () => act("PUT", "/api/lamp", { on: true, rgb }) })),
+  h("span", { class: "swatch custom", "aria-label": "Custom colour" }, h("input", { type: "color", "aria-label": "Custom colour", onchange: (e) => act("PUT", "/api/lamp", { on: true, rgb: hexToRgb(e.target.value) }) })));
+
+const slider = (id, send) => {
+  $(id).addEventListener("input", (e) => { $(id + "-value").textContent = e.target.value + "%"; });
+  $(id).addEventListener("change", (e) => send(+e.target.value));
+};
+slider("lamp-brightness", (value) => act("PUT", "/api/lamp", { on: true, brightness: value }));
+slider("clock-brightness", (value) => act("PUT", "/api/clock", { brightness: value }));
+slider("program-volume", (value) => act("PUT", `/api/programs/${program}/settings`, { volume: value }));
+
+$("clock-display").addEventListener("change", (e) => act("PUT", "/api/clock", { display: e.target.checked }));
+$("private-mode").addEventListener("change", (e) => act("PUT", "/api/private-mode", { on: e.target.checked }));
+$("alarms-enabled").addEventListener("change", (e) => act("PUT", "/api/alarms/enabled", { enabled: e.target.checked }));
+$("start").addEventListener("click", () => act("POST", "/api/programs/start", { program }, "Program started"));
+$("stop").addEventListener("click", () => act("POST", "/api/programs/stop", undefined, "Stopped"));
+$("snooze").addEventListener("click", () => act("POST", "/api/snooze", undefined, "Snoozed"));
+$("sync-time").addEventListener("click", () => act("POST", "/api/time/sync", {}, "Time synced"));
+
+load().catch(() => {});
+setInterval(() => load().catch(() => {}), 5000);
+</script>
+</body>
+</html>
